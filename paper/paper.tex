@@ -1,0 +1,325 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
+\usepackage{natbib}
+
+\title{Interventions per 1,000 Robot-Hours:\\
+Toward Standardized Reliability Evidence for Deployed Robot Fleets}
+
+\author{
+  Manuel Bulos\\
+  \texttt{manuelbulos@gmail.com}
+}
+
+\date{July 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Learning-based robots are entering commercial deployment, yet the robotics
+industry lacks a standardized way to measure, record, or report their field
+reliability. Intervention logs---records of humans pausing, resetting,
+teleoperating, or physically assisting a robot---are proprietary,
+unstructured, and mutually incompatible across vendors. As a consequence, no
+one can answer the question that operators, insurers, and certification
+bodies are beginning to ask: \emph{how many human interventions does a robot
+fleet require per 1,000 robot-hours, and why?} This position paper argues
+that the robotics industry needs the equivalent of aviation's flight data
+recorder and the autonomous-vehicle industry's disengagement report, before
+regulation imposes one. We propose (i) a minimal set of fleet reliability
+metrics centered on the intervention rate per 1,000 robot-hours; (ii) an
+open recording schema that captures robot telemetry, policy actions, and
+human interventions on a shared clock; and (iii) an intervention taxonomy
+with root-cause labels. We release a reference implementation, including a
+simulated deployment that demonstrates cross-version regression detection
+from intervention telemetry alone. We close with a discussion of the
+incentive, privacy, and standardization challenges, and argue that shared
+failure evidence is a public good the field should build deliberately rather
+than reactively.
+\end{abstract}
+
+\section{Introduction}
+
+Commercial deployments of learning-based robots crossed a threshold in
+2025--2026: humanoid and manipulation systems now run production shifts in
+automotive plants and logistics facilities \citep{figure2026bmw,
+agility2025gxo}. The public retrospectives of these pilots are notable both
+for what they report and for what they omit. Figure's eleven-month
+deployment at BMW Spartanburg reports more than 1,250 hours of runtime and a
+task success rate near 98.7\%---which, at production cadence, implies a
+failure roughly every 77 cycles, and on the order of hundreds of manual
+interventions over the program \citep{figure2026bmw, ifactory2026bmw}. The
+deployment's stated goal of zero interventions per shift is not reported as
+achieved. Independent reviews of factory-floor humanoid programs find that
+intervention logs are treated as proprietary, that no standardized logging
+format exists, and that basic reliability questions---mean time between
+failures under production conditions, interventions per unit of operating
+time, root-cause distributions---cannot be answered from public information
+for any commercial robot fleet \citep{karp2026reality}.
+
+This is not a temporary reporting gap; it is a structural one. Robot vendors
+have every short-term incentive to keep failure data private, no shared
+schema in which to record it even if they wished to publish, and no agreed
+metric that would make two fleets comparable. The result is an industry
+about to scale physical systems into human environments with less
+standardized reliability evidence than aviation had in the 1960s or the
+autonomous-vehicle (AV) industry had in 2015.
+
+Two adjacent industries suggest what comes next. In aviation, flight data
+recorders became mandatory equipment decades ago, and standardized incident
+evidence is credited as a foundation of the field's safety culture
+\citep{icao2016annex6}. In the AV industry, California's requirement that
+permit holders report \emph{disengagements}---events where a safety driver
+takes control---created, whatever its flaws, the first public,
+cross-vendor, longitudinal reliability dataset in autonomy
+\citep{dmv2024disengagement}. Robotics has no equivalent of either
+instrument, while its regulatory context is moving quickly: ISO~25785-1,
+the first international safety standard specifically addressing industrial
+mobile robots with actively controlled stability (a category that includes
+humanoids), is in draft with publication expected around 2027
+\citep{iso25785}, and insurers underwriting robot deployments already
+demand documented risk assessments and audit trails as conditions of
+coverage \citep{humanoidliability2026}.
+
+This paper takes a position: \textbf{the robotics industry should adopt a
+standardized, vendor-neutral format for recording and reporting field
+reliability evidence---now, while the installed base is small, rather than
+after regulation or a high-profile incident forces a worse version of the
+same requirement.} We make three concrete proposals and release a reference
+implementation.
+
+\section{The evidence gap}
+
+\subsection{What deployments report today}
+
+Public reliability reporting from commercial robot deployments consists
+largely of vendor-selected aggregates: cumulative units shipped, cumulative
+tasks completed, and task success rates over unspecified conditions
+\citep{karp2026reality}. Success rates without exposure denominators
+(operating hours, cycles attempted) and without intervention accounting are
+not reliability evidence; a 98\% success rate is compatible with both a
+robust system and one requiring constant supervision, depending on cycle
+time and recovery cost. The metrics that industrial buyers actually use to
+evaluate equipment---mean time between failures (MTBF), interventions per
+unit time, service burden, uptime---are either not recorded in comparable
+form or not disclosed \citep{newmarketpitch2026}.
+
+\subsection{Why the gap persists}
+
+Three forces sustain the gap. \emph{Incentives:} in a competitive funding
+environment, no vendor benefits from unilaterally publishing failure rates.
+\emph{Infrastructure:} even willing vendors have no shared schema; each
+team's logging is an internal engineering artifact, typically retrofitted
+onto streaming pipelines that were designed for delivery rather than
+faithful recording \citep{roboticstomorrow2026webrtc}. \emph{Demand
+immaturity:} until recently, no external party had standing to demand
+better. This is changing: insurers now audit deployments and void coverage
+on mismatches between the assessed and actual application
+\citep{humanoidliability2026}, and conformity assessment against
+ISO~25785-1 will require operational records that today's logging practices
+cannot produce \citep{iso25785}.
+
+\subsection{The cost of the gap}
+
+The absence of standardized failure evidence is not only a transparency
+problem. It slows the field's own progress. Datasets collected by skilled
+operators who rarely fail produce policies that never learn recovery
+behavior; deliberately captured failure and recovery episodes measurably
+improve policy robustness \citep{evsint2026teleop}. Real-deployment
+failures---with the full telemetry context that preceded them---are among
+the scarcest and most valuable training signals in embodied AI, and today
+they are discarded or siloed at the moment of capture.
+
+\section{Proposal 1: A minimal metric set}
+
+We propose that deployed robot fleets be characterized by the following
+metrics, all computable from the schema in Section~\ref{sec:schema}.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Metric} & \textbf{Definition} & \textbf{Unit} \\
+\midrule
+Intervention rate & Human interventions per 1,000 robot-hours & $\mathrm{I/kh}$ \\
+MTBF & Robot-hours between interventions & hours \\
+Autonomous success rate & Episodes completed without intervention & fraction \\
+Recovered rate & Episodes completed only via human recovery & fraction \\
+Mean recovery time & Mean duration of intervention events & seconds \\
+Operator burden & Total operator time per 1,000 robot-hours & hours/kh \\
+\bottomrule
+\end{tabular}
+\caption{Proposed fleet reliability metrics. Robot-hours are wall-clock
+hours in which the robot was tasked, including time under intervention.}
+\label{tab:metrics}
+\end{table}
+
+The central quantity is the \textbf{intervention rate per 1,000
+robot-hours} ($\mathrm{I/kh}$). We argue for it, rather than task success
+rate, as the headline reliability metric for three reasons. First, it has
+an exposure denominator, making fleets of different sizes and duty cycles
+comparable. Second, it is behaviorally meaningful to operators: it
+translates directly into supervision staffing. Third, it has precedent:
+it is the robotics analogue of the AV industry's miles-per-disengagement,
+a metric that, despite legitimate criticisms of gameability
+\citep{dmv2024disengagement}, successfully created public, longitudinal,
+cross-vendor comparability where none existed.
+
+An episode that requires human recovery must be classified as
+\emph{recovered}, not \emph{successful}. Conflating the two is the single
+most common distortion in current vendor reporting.
+
+\section{Proposal 2: A shared-clock recording schema}
+\label{sec:schema}
+
+Reliability metrics are only as trustworthy as the records beneath them. We
+propose a minimal schema of four append-only streams, all timestamped
+against a single monotonic session clock:
+
+\begin{enumerate}
+  \item \textbf{Frames}: proprioceptive state at a fixed rate---joint
+  positions and velocities, end-effector pose, gripper force and aperture,
+  and references to externally stored camera frames.
+  \item \textbf{Actions}: policy outputs, each tagged with the model
+  version that produced it, the task phase, and optionally the policy's
+  own confidence.
+  \item \textbf{Interventions}: human take-over events with start and end
+  times, intervention type, operator identity, task phase, and a
+  root-cause label (Section~\ref{sec:taxonomy}).
+  \item \textbf{Episodes}: task attempts with outcome
+  (\emph{success}, \emph{recovered}, \emph{failure}, \emph{aborted}) and
+  the model version under which they ran.
+\end{enumerate}
+
+Two design decisions matter more than the specific fields. First, the
+\emph{shared clock}: interventions must be temporally alignable with the
+telemetry that preceded them, or root-cause analysis degenerates into
+anecdote. Retrofitted logging pipelines routinely fail this requirement
+\citep{roboticstomorrow2026webrtc}. Second, \emph{model-version tagging on
+every action}: learning-based systems change behavior with every policy
+update, and reliability claims that do not condition on model version are
+not reproducible. Version tagging is what turns a reliability log into a
+regression-detection instrument (Section~\ref{sec:implementation}).
+
+The schema is deliberately storage-format agnostic; our reference
+implementation uses JSONL for auditability, and the streams map directly
+onto existing robot-learning dataset conventions such as RLDS and LeRobot
+\citep{ramos2021rlds, cadene2024lerobot}, so that reliability recording and
+training-data capture can be the same act.
+
+\section{Proposal 3: An intervention taxonomy}
+\label{sec:taxonomy}
+
+Cross-fleet comparability requires that ``a human stepped in'' mean the
+same thing everywhere. We propose a two-level labeling: a closed set of
+intervention \emph{types}, and an open, evolving set of root-cause labels.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}lp{9.5cm}@{}}
+\toprule
+\textbf{Type} & \textbf{Definition} \\
+\midrule
+\texttt{pause}    & Operator halted the robot; no state was changed. \\
+\texttt{reset}    & Task cycle was restarted from a defined initial state. \\
+\texttt{teleop}   & Operator took manual control of the robot to complete
+                    or correct the task. \\
+\texttt{physical} & Operator physically altered the scene or the robot
+                    (cleared a jam, repositioned an object). \\
+\texttt{estop}    & Emergency stop, triggered by a human or a safety system. \\
+\bottomrule
+\end{tabular}
+\caption{Proposed closed set of intervention types.}
+\label{tab:taxonomy}
+\end{table}
+
+Root-cause labels (e.g., \texttt{grasp\_slip}, \texttt{perception\_miss},
+\texttt{joint\_fault}, \texttt{collision}) will inevitably be
+operator-dependent and incomplete. For this reason the schema records the
+telemetry window preceding every intervention, so that unsupervised
+clustering over failure signatures can recover root-cause structure even
+where labels are missing or inconsistent---an approach we demonstrate in
+the reference implementation.
+
+\section{Reference implementation}
+\label{sec:implementation}
+
+We release \texttt{robot-blackbox}, an open-source reference implementation
+of the schema and metrics.\footnote{\url{https://github.com/manuelbulos/robot-blackbox}}
+It comprises a recording SDK whose API wraps an arbitrary control loop; the
+metric computations of Table~\ref{tab:metrics}; failure clustering over
+pre-intervention telemetry windows; cross-version regression detection; and
+an audit-oriented report generator.
+
+To exercise the pipeline end-to-end without hardware, the implementation
+includes a simulated 6-DoF manipulation deployment with injectable failure
+modes whose telemetry signatures (gripper force collapse on slips, velocity
+variance on faults) are modeled on failure classes reported from real
+pilots. In a demonstration scenario, a fleet runs 200 cycles on a baseline
+policy version and 200 cycles on an updated version with a deliberately
+regressed grasping module. From intervention telemetry alone, the pipeline
+reports the update's intervention rate as $1.8\times$ the baseline's
+(8{,}766 vs.\ 4{,}782 per 1,000 robot-hours in the simulated fleet) and
+localizes the regression to the grasp phase via clustering. We emphasize
+that these figures are simulated and illustrate the \emph{instrument},
+not any real fleet; producing the first real cross-vendor baselines is
+precisely the point of standardizing the format.
+
+\section{Discussion}
+
+\textbf{Incentives.} No vendor will publish reliability evidence
+unilaterally, and this proposal does not ask them to. The near-term
+adopters are the parties who already need the records privately: operators
+who must staff supervision, insurers who must price deployments
+\citep{humanoidliability2026}, and vendors who must diagnose their own
+regressions. Public benchmarks can emerge later from anonymized
+aggregation, as they did in the AV industry only under regulatory
+compulsion \citep{dmv2024disengagement}. The window to shape the format
+voluntarily is before ISO~25785-1 conformity assessment and insurance
+requirements harden around ad-hoc alternatives \citep{iso25785}.
+
+\textbf{Privacy and competition.} Intervention records encode competitive
+information. The schema therefore separates the \emph{format} (open) from
+the \emph{data} (owned by the deploying parties), and aggregation for
+benchmarking requires explicit anonymization of task, site, and embodiment
+identifiers. The aviation precedent is instructive: standardized recorders
+coexist with confidential investigation regimes.
+
+\textbf{Gaming.} Any headline metric invites optimization against it; AV
+disengagement counts were criticized on exactly this ground. Two properties
+of the proposed schema mitigate this: interventions are recorded with
+surrounding telemetry (making deletion detectable as coverage gaps on the
+shared clock), and the episode outcome taxonomy makes ``success via human''
+unrepresentable as autonomous success.
+
+\textbf{Failure data as a training asset.} Because the schema is compatible
+with robot-learning dataset formats \citep{ramos2021rlds, cadene2024lerobot},
+every recorded intervention is simultaneously a labeled failure-and-recovery
+episode---the training signal that demonstration datasets systematically
+lack \citep{evsint2026teleop}. Reliability evidence and recovery-learning
+data are the same bytes; the industry currently throws both away.
+
+\section{Conclusion}
+
+Robotics is repeating a pattern aviation and autonomous driving have
+already lived through: capability arrives before evidence infrastructure,
+and evidence infrastructure arrives only when demanded from outside. The
+field has a short window in which the instrument can be designed by the
+people who understand robots, rather than imposed by those who do not. A
+shared clock, four streams, five intervention types, and one honest
+metric---interventions per 1,000 robot-hours---would be enough to start.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}
