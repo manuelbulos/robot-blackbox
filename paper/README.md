@@ -2,7 +2,9 @@
 
 **"Interventions per 1,000 Robot-Hours: Toward Standardized Reliability Evidence for Deployed Robot Fleets"**
 
-LaTeX source for the arXiv position paper. The paper proposes the metrics, schema, and intervention taxonomy that `robot-blackbox` implements.
+LaTeX source and compiled PDF ([paper.pdf](paper.pdf)) for the position paper. The paper proposes the metrics, schema, and intervention taxonomy that `robot-blackbox` implements.
+
+Published directly here on GitHub. An arXiv submission is optional future work — checklist below if you ever want it.
 
 ## Build
 

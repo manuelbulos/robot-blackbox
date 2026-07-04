@@ -2,6 +2,8 @@
 
 **The flight recorder for robots.**
 
+📄 **Position paper:** [*Interventions per 1,000 Robot-Hours: Toward Standardized Reliability Evidence for Deployed Robot Fleets*](paper/paper.pdf) — the argument, metrics, and schema this repo implements.
+
 ![Reliability dashboard](dashboard.png)
 
 Robots are deploying into warehouses and factories, but nobody can answer the question every ops manager, insurer, and safety auditor is about to ask:
