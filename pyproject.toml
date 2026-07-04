@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "robot-blackbox"
+version = "0.1.0"
+description = "The flight recorder for robots: synchronized capture of telemetry, actions, and human interventions, with reliability analytics."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Manuel Bulos" }]
+dependencies = ["numpy>=1.24"]
+
+[project.scripts]
+blackbox = "blackbox.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["blackbox*"]
